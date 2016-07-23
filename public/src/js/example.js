@@ -11,7 +11,7 @@ var stratify = d3.stratify()
 
 
 //d3.csv("build/resources/flare.csv", function(error, data) {
-d3.json("build/resources/family.json", (error, data) => {
+d3.json("build/resources/test.out", (error, data) => {
   if (error) throw error;
 
   //var root = stratify(data)

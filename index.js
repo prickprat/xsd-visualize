@@ -45,7 +45,13 @@ fs.readFileAsync(xsdPath)
          }
 
          let explodedTree = explodeTree(result, simplifiedElems);
-         console.dir(explodedTree, {depth:null});
+         treeWalkTransform(explodedTree, [
+            recordParentNodeLinkInfo,
+         ]);
+         treeWalkTransform(explodedTree, [
+            collapseElementsToChildren,
+         ]);
+         console.log(JSON.stringify(explodedTree));
       });
    })
    .catch((err) => {
@@ -136,7 +142,7 @@ function stripPrefix(tagName){
 //Nodes must be objects or arrays
 //In place function
 function treeWalkTransform(node, transformationFuncs){
-   if (node === null || node === undefined || typeof node !== 'object'){
+   if (node === null || node === undefined || typeof node !== 'object' || _.isEmpty(node)){
       return;
    }
 
@@ -207,6 +213,33 @@ function pullPropertiesFromAttributes(node){
    return node;
 }
 
+function recordParentNodeLinkInfo (node){
+   //If the node has children inside a sequence
+   let seqElems = _.get(node, 'sequence.element');
+   injectParentInfoIntoElements(seqElems, 'sequence');
+   //If the node has children inside a choice
+   let choiceElems = _.get(node, 'choice.element');
+   injectParentInfoIntoElements(choiceElems, 'choice');
+
+   function injectParentInfoIntoElements(elems, groupName){
+      if (elems){
+         let props = _.omit(_.get(node, groupName), ['element', 'choice', 'sequence']);
+         // console.log('>>>> ' + groupName + ' ::: ');
+         // console.dir(props, {depth: null});
+
+         if (!Array.isArray(elems)){
+            elems = [elems];
+         }
+         elems.forEach((elem) => {
+            elem._parent = {
+               group: groupName,
+            };
+            _.assign(elem._parent, props);
+         });
+      }
+   }
+}
+
 function convertBaseToType(node){
    let propsToConvert = [
       'restriction._attr.base',
@@ -274,16 +307,6 @@ function foldEnumerations(node){
    return node;
 }
 
-function compressSequence(node){
-   let seq = _.get(node, 'sequence[0].element');
-
-   if (seq){
-      node.sequence = seq;
-   }
-
-   return node;
-}
-
 function foldPatterns(node){
    let patterns = node.pattern;
 
@@ -311,4 +334,13 @@ function explodeTree(parsedXsd, simplifiedElems){
    return clonedRootElem;
 }
 
+function collapseElementsToChildren(node){
+   let seqElems = _.get(node, 'sequence.element', []);
+   let choiceElems = _.get(node, 'sequence.choice.element', []);
+
+   if (!_.isEmpty(seqElems) || !_.isEmpty(choiceElems)){
+      node.children = _.concat([], seqElems, choiceElems);
+      delete node.sequence;
+   }
+}
 
